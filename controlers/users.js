@@ -1,53 +1,70 @@
 const {response, request} = require('express')
+const Usuario = require('../models/usuario')
+const bcryptjs = require('bcryptjs')
 
-const getUsers = (req = request, res = response) => {
+const getUsers = async(req = request, res = response) => {
     
-    const {nombre, key, page = 1, limit = 10} = req.query 
+    const {limite = 5, desde=0} = req.query 
+    
+    const [total, usuarios] = await Promise.all([
+        Usuario.countDocuments({estado: true}),
+        Usuario.find({estado: true})
+        .limit(Number(limite))
+        .skip(Number(desde))
+    ])
+    
+    res.json({total, usuarios})
+}
+
+const postUsers = async(req, res = response) => {
+
+    const {nombre, password, correo, rol} = req.body
+    const usuario = new Usuario({nombre, password, correo, rol})
+    
+    // ENCRIPTAR CONTRASEÑA
+    const salt = bcryptjs.genSaltSync()
+    usuario.password = bcryptjs.hashSync(password, salt) 
+
+    // GUARDAR EN BD
+    await usuario.save()
     
     res.json( {
-        msg: "Metodo get - controler",
-        nombre,
-        key,
-        page,
-        limit
+        usuario
     })
+}
+
+const putUsers = async(req, res = response) => {
+    
+    const {id} = req.params
+    const {_id, password, google, ...resto} = req.body
+
+    // ENCRIPTAR CONTRASEÑA
+    if(password){
+        const salt = bcryptjs.genSaltSync()
+        resto.password = bcryptjs.hashSync(password, salt)
+    }
+
+    console.log(resto)
+    const usuario = await Usuario.findByIdAndUpdate(id, resto)
+
+    res.json(usuario)
     
 }
 
-const postUsers = (req, res = response) => {
-
-    const body = req.body
-
-    res.json( {
-        msg: "Metodo post - controler",
-        ...body
-    })
-    
-}
-
-const putUsers = (req, res = response) => {
+const deleteUsers = async(req, res = response) => {
     
     const {id} = req.params
 
-    res.json( {
-        msg: "Metodo put - controler",
-        id
-    })
+    //const usuario = await Usuario.findByIdAndDelete(id)
     
-}
+    const usuario = await Usuario.findByIdAndUpdate(id, {estado:false})
 
-const pacthUsers = (req, res = response) => {
-    res.send("Metodo patch - controle")
-}
-
-const deleteUsers = (req, res = response) => {
-    res.send("Metodo delete - controle")
+    res.json(usuario)
 }
 
 module.exports = {
     getUsers,
     postUsers,
     putUsers,
-    pacthUsers,
     deleteUsers
 }
